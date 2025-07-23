@@ -1,5 +1,4 @@
-// Email template for order confirmation and status update
-const BOOK_SERVICE = process.env.BOOK_SERVICE || 'http://localhost:8000';
+
 
 // Thêm hàm chuyển trạng thái và phương thức sang tiếng Việt
 const STATUS_VI = {
@@ -42,7 +41,7 @@ export function orderItemsTable(items) {
       <tbody>
         ${items.map(item => {
     const imagePath = (item.primaryImage || '').replace(/\\/g, '/');
-    const imageUrl = `${BOOK_SERVICE}/${imagePath}`;
+          const imageUrl = `${process.env.BOOK_SERVICE}/${imagePath}`;
     console.log('[EMAIL TEMPLATE] Processing item:', JSON.stringify(item, null, 2));
     console.log('[EMAIL TEMPLATE] Generated image URL:', imageUrl);
     return `
