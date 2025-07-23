@@ -11,9 +11,6 @@ import moment from 'moment';
 import querystring from 'qs';
 import axios from 'axios';
 import { sendOrderConfirmationEmail, sendOrderStatusEmail, sendPaymentNotificationEmail } from '../utils/emailService.js';
-const BOOK_SERVICE = process.env.BOOK_SERVICE || 'http://localhost:8000';
-const MAIN_SERVICE = process.env.MAIN_SERVICE || 'http://localhost:5000';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 function sortObject(obj) {
     if (!obj || typeof obj !== 'object') {
@@ -72,7 +69,7 @@ const order_controller = {
             if (!userEmail) {
                 // Gọi API để lấy email của user
                 try {
-                    const userResponse = await axios.get(`${MAIN_SERVICE}/api/users/profile`, {
+                    const userResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/users/profile`, {
                         headers: { Authorization: userToken },
                     });
                     userEmail = userResponse.data.data.user.email;
@@ -102,7 +99,7 @@ const order_controller = {
                 finalFullName = fullName;
             if (savedAddressId) {
                 const addressResponse = await axios.get(
-                    `${MAIN_SERVICE}/api/address/${savedAddressId}`,
+                    `${process.env.MAIN_SERVICE_URL}/api/address/${savedAddressId}`,
                     {
                         headers: { Authorization: userToken },
                     }
@@ -143,7 +140,7 @@ const order_controller = {
 
             // Lấy thông tin sách từ bookService
             const bookResponse = await axios.get(
-                `${BOOK_SERVICE}/api/books/multiple?ids=${bookIds.join(',')}`,
+                `${process.env.BOOK_SERVICE_URL}/api/books/multiple?ids=${bookIds.join(',')}`,
                 {
                     headers: { Authorization: userToken },
                 }
@@ -208,7 +205,7 @@ const order_controller = {
             // Cập nhật salesCount cho từng sách trong đơn hàng
             for (const item of orderItems) {
                 await axios.put(
-                    `${BOOK_SERVICE}/api/books/${item.bookId}/sales`,
+                    `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/sales`,
                     { quantity: item.quantity },
                     { headers: { Authorization: userToken } }
                 );
@@ -230,7 +227,7 @@ const order_controller = {
             // Cập nhật tồn kho
             for (const item of cartItems) {
                 await axios.put(
-                    `${BOOK_SERVICE}/api/books/${item.bookId}/stock`,
+                    `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                     {
                         quantity: -item.quantity,
                         _version: books.find((b) => b._id === item.bookId.toString())._version,
@@ -391,7 +388,7 @@ const order_controller = {
             let emailToSend = userEmail;
             if (!emailToSend) {
                 try {
-                    const userResponse = await axios.get(`${MAIN_SERVICE}/api/users/${order.userId}`, {
+                    const userResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/users/${order.userId}`, {
                         headers: { Authorization: req.headers.authorization },
                     });
                     emailToSend = userResponse.data.data.user.email;
@@ -400,7 +397,7 @@ const order_controller = {
                     emailToSend = null;
                 }
             }
-            
+
             console.log('[VNPay] Tạo URL thanh toán cho order', order._id, 'vnp_Amount:', vnp_Params.vnp_Amount);
             return response(res, 200, 'Tạo URL thanh toán VNPay thành công', { vnpUrl });
         } catch (error) {
@@ -444,7 +441,7 @@ const order_controller = {
             return {
                 RspCode: '02',
                 Message: 'Order already confirmed',
-                redirect: `${FRONTEND_URL}/order-success?orderId=${order._id}&method=${PAYMENT_METHOD.VNPAY}&status=already_paid`
+                redirect: `${process.env.FRONTEND_URL}/order-success?orderId=${order._id}&method=${PAYMENT_METHOD.VNPAY}&status=already_paid`
             };
         }
 
@@ -459,7 +456,7 @@ const order_controller = {
             return {
                 RspCode: '97',
                 Message: 'Checksum failed',
-                redirect: `${FRONTEND_URL}/payment/error?message=${encodeURIComponent('Chữ ký giao dịch không hợp lệ.')}`
+                redirect: `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('Chữ ký giao dịch không hợp lệ.')}`
             };
         }
 
@@ -488,7 +485,7 @@ const order_controller = {
             for (const item of order.items) {
                 try {
                     await axios.put(
-                        `${BOOK_SERVICE}/api/books/${item.bookId}/stock`,
+                        `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                         { quantity: item.quantity },
                         { headers: { Authorization: req.headers.authorization } } // Assuming token is available in req
                     );
@@ -497,7 +494,7 @@ const order_controller = {
                 }
             }
             await Promise.all([order.save({ session }), payment.save({ session })]);
-            return { RspCode: '99', Message: 'Transaction timeout', redirect: `${FRONTEND_URL}/payment/failure?orderId=${order._id}&code=timeout` };
+            return { RspCode: '99', Message: 'Transaction timeout', redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=timeout` };
         }
 
         if (Math.abs(receivedAmount - order.finalAmount) > 0.01) {
@@ -508,7 +505,7 @@ const order_controller = {
             return {
                 RspCode: '04',
                 Message: 'Amount invalid',
-                redirect: `${FRONTEND_URL}/payment/failure?orderId=${order._id}&code=amount_mismatch`
+                redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=amount_mismatch`
             };
         }
 
@@ -546,7 +543,7 @@ const order_controller = {
             return {
                 RspCode: '00',
                 Message: 'Success',
-                redirect: `${FRONTEND_URL}/order-success?orderId=${order._id}&method=${PAYMENT_METHOD.VNPAY}`
+                redirect: `${process.env.FRONTEND_URL}/order-success?orderId=${order._id}&method=${PAYMENT_METHOD.VNPAY}`
             };
 
         } else {
@@ -572,7 +569,7 @@ const order_controller = {
             return {
                 RspCode: vnp_ResponseCode, // Return the actual error code from VNPay
                 Message: 'Transaction failed',
-                redirect: `${FRONTEND_URL}/payment/failure?orderId=${order._id}&code=${vnp_ResponseCode}&message=${encodeURIComponent(payment.gatewayMessage)}`
+                redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=${vnp_ResponseCode}&message=${encodeURIComponent(payment.gatewayMessage)}`
             };
         }
     },
@@ -594,7 +591,7 @@ const order_controller = {
             await session.abortTransaction();
             console.error('[VNPay RETURN] Lỗi xử lý kết quả VNPay:', error);
             // Redirect to a generic error page in case of unexpected errors
-            return res.redirect(`${FRONTEND_URL}/payment/error?message=${encodeURIComponent('Đã xảy ra lỗi không mong muốn.')}`);
+            return res.redirect(`${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('Đã xảy ra lỗi không mong muốn.')}`);
         } finally {
             session.endSession();
         }
@@ -761,7 +758,7 @@ const order_controller = {
             let userEmail = order.userEmail;
             if (!userEmail) {
                 try {
-                    const userResponse = await axios.get(`${MAIN_SERVICE}/api/users/${order.userId}`, {
+                    const userResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/users/${order.userId}`, {
                         headers: { Authorization: userToken },
                     });
                     userEmail = userResponse.data.data.user.email;
@@ -829,7 +826,7 @@ const order_controller = {
                 for (const item of order.items) {
                     try {
                         await axios.put(
-                            `${BOOK_SERVICE}/api/books/${item.bookId}/stock`,
+                            `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                             {
                                 quantity: item.quantity,
                             },
@@ -847,7 +844,7 @@ const order_controller = {
                     for (const item of order.items) {
                         try {
                             await axios.put(
-                                `${BOOK_SERVICE}/api/books/${item.bookId}/stock`,
+                                `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                                 {
                                     quantity: item.quantity,
                                 },
@@ -1011,7 +1008,7 @@ const order_controller = {
             for (const item of order.items) {
                 try {
                     await axios.put(
-                        `${BOOK_SERVICE}/api/books/${item.bookId}/stock`,
+                        `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                         {
                             quantity: item.quantity,
                         },
@@ -1042,7 +1039,7 @@ const order_controller = {
             let emailToSend = order.userEmail;
             if (!emailToSend) {
                 try {
-                    const userResponse = await axios.get(`${MAIN_SERVICE}/api/users/${order.userId}`, {
+                    const userResponse = await axios.get(`${process.env.MAIN_SERVICE_URL}/api/users/${order.userId}`, {
                         headers: { Authorization: userToken },
                     });
                     emailToSend = userResponse.data.data.user.email;
@@ -1105,7 +1102,7 @@ const order_controller = {
 
             // Lấy thông tin sách từ bookService
             const bookResponse = await axios.get(
-                `${BOOK_SERVICE}/api/books/multiple?ids=${bookIds.join(',')}`,
+                `${process.env.BOOK_SERVICE_URL}/api/books/multiple?ids=${bookIds.join(',')}`,
                 { headers: { Authorization: userToken } }
             );
             const books = bookResponse.data.data.books;

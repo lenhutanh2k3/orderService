@@ -3,10 +3,9 @@ import response from '../utils/response.js';
 import AppError from '../utils/AppError.js';
 import mongoose from 'mongoose';
 import axios from 'axios';
-import order_controller from './order_controller.js';
 
-const BOOK_SERVICE = process.env.BOOK_SERVICE || 'http://localhost:8000';
-
+const book_service = process.env.BOOK_SERVICE_URL;
+console.log("book_service", book_service);
 const cart_controller = {
     getCart: async (req, res, next) => {
         try {
@@ -23,7 +22,7 @@ const cart_controller = {
             let books = [];
             
             if (bookIds.length > 0) {
-                const bookResponse = await axios.get(`${BOOK_SERVICE}/api/books/multiple?ids=${bookIds.join(',')}`, {
+                const bookResponse = await axios.get(`${book_service}/api/books/multiple?ids=${bookIds.join(',')}`, {
                     headers: { Authorization: userToken }
                 });
                 books = bookResponse.data.data.books;
@@ -66,7 +65,7 @@ const cart_controller = {
                 throw new AppError('ID sách không hợp lệ.', 400);
             }
 
-            const bookResponse = await axios.get(`${BOOK_SERVICE}/api/books/${bookId}`, {
+            const bookResponse = await axios.get(`${book_service}/api/books/${bookId}`, {
                 headers: { Authorization: userToken }
             });
             const book = bookResponse.data.data.book;
@@ -143,7 +142,7 @@ const cart_controller = {
                 throw new AppError('Sách không tìm thấy trong giỏ hàng.', 404);
             }
 
-            const bookResponse = await axios.get(`${BOOK_SERVICE}/api/books/${bookId}`, {
+            const bookResponse = await axios.get(`${book_service}/api/books/${bookId}`, {
                 headers: { Authorization: userToken }
             });
             const book = bookResponse.data.data.book;
