@@ -456,7 +456,7 @@ const order_controller = {
             return {
                 RspCode: '97',
                 Message: 'Checksum failed',
-                redirect: `${process.env.FRONTEND_URL}/payment/error?message=${encodeURIComponent('Chữ ký giao dịch không hợp lệ.')}`
+                redirect: `${process.env.FRONTEND_URL}/payment/error?orderId=${order._id}&code=${encodeURIComponent('Chữ ký giao dịch không hợp lệ.')}`
             };
         }
 
@@ -494,7 +494,7 @@ const order_controller = {
                 }
             }
             await Promise.all([order.save({ session }), payment.save({ session })]);
-            return { RspCode: '99', Message: 'Transaction timeout', redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=timeout` };
+            return { RspCode: '99', Message: 'Transaction timeout', redirect: `${process.env.FRONTEND_URL}/payment/error?orderId=${order._id}&code=timeout` };
         }
 
         if (Math.abs(receivedAmount - order.finalAmount) > 0.01) {
@@ -505,7 +505,7 @@ const order_controller = {
             return {
                 RspCode: '04',
                 Message: 'Amount invalid',
-                redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=amount_mismatch`
+                redirect: `${process.env.FRONTEND_URL}/payment/error?orderId=${order._id}&code=amount_mismatch`
             };
         }
 
@@ -532,7 +532,8 @@ const order_controller = {
                     order.orderCode,
                     'PAID',
                     order.finalAmount,
-                    'VNPAY'
+                    'VNPAY',
+                    order._id
                 );
             } catch (emailError) {
                 console.error('Lỗi gửi email thông báo thành công:', emailError);
@@ -558,7 +559,9 @@ const order_controller = {
                     order.orderCode,
                     'FAILED',
                     order.finalAmount,
-                    'VNPAY'
+                    'VNPAY',
+                    order._id,
+                    payment.gatewayMessage
                 );
             } catch (emailError) {
                 console.error('Lỗi gửi email thông báo thất bại:', emailError);
@@ -569,7 +572,7 @@ const order_controller = {
             return {
                 RspCode: vnp_ResponseCode, // Return the actual error code from VNPay
                 Message: 'Transaction failed',
-                redirect: `${process.env.FRONTEND_URL}/payment/failure?orderId=${order._id}&code=${vnp_ResponseCode}&message=${encodeURIComponent(payment.gatewayMessage)}`
+                redirect: `${process.env.FRONTEND_URL}/payment/error?orderId=${order._id}&code=${vnp_ResponseCode}&message=${encodeURIComponent(payment.gatewayMessage)}`
             };
         }
     },
@@ -885,17 +888,19 @@ const order_controller = {
     getOrdersByUser: async (req, res, next) => {
         try {
             const userId = req.user.id;
-            const { page = 1, limit = 10, status } = req.query;
+            const { page = 1, limit = 10, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
             let query = { userId };
             if (status && Object.values(ORDER_STATUS).includes(status)) {
                 query.orderStatus = status;
             }
             const skip = (parseInt(page) - 1) * parseInt(limit);
+            let sortOption = {};
+            sortOption[sortBy] = sortOrder === 'asc' ? 1 : -1;
             const [orders, total] = await Promise.all([
                 Order.find(query)
                     .populate('activePaymentId')
                     .populate('paymentAttempts')
-                    .sort({ createdAt: -1 })
+                    .sort(sortOption)
                     .skip(skip)
                     .limit(parseInt(limit))
                     .lean(),

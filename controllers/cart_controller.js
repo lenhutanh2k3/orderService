@@ -20,7 +20,7 @@ const cart_controller = {
             // Lấy thông tin sách từ bookService
             const bookIds = cart.items.map(item => item.bookId.toString());
             let books = [];
-            
+
             if (bookIds.length > 0) {
                 const bookResponse = await axios.get(`${book_service}/api/books/multiple?ids=${bookIds.join(',')}`, {
                     headers: { Authorization: userToken }

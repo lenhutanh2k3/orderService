@@ -27,7 +27,7 @@ function getPaymentVi(method) {
   return PAYMENT_VI[method.toUpperCase()] || method;
 }
 
-export function orderItemsTable(items) {
+export function orderItemsTable(items, bookServiceBaseUrl) {
   return `
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
       <thead>
@@ -41,9 +41,8 @@ export function orderItemsTable(items) {
       <tbody>
         ${items.map(item => {
     const imagePath = (item.primaryImage || '').replace(/\\/g, '/');
-          const imageUrl = `${process.env.BOOK_SERVICE}/${imagePath}`;
-    console.log('[EMAIL TEMPLATE] Processing item:', JSON.stringify(item, null, 2));
-    console.log('[EMAIL TEMPLATE] Generated image URL:', imageUrl);
+    const imageUrl = `${bookServiceBaseUrl}/${imagePath}`;
+
     return `
             <tr>
               <td style="padding:8px;border:1px solid #eee;text-align:center;">
@@ -87,7 +86,7 @@ export function orderConfirmationEmail({ order }) {
       <h2 style="color:#1976d2;">Xác nhận đặt hàng thành công!</h2>
       <p>Cảm ơn bạn đã đặt hàng tại <strong>Nhà Sách Online</strong>.</p>
       ${orderInfoBlock(order)}
-      ${orderItemsTable(order.items)}
+      ${orderItemsTable(order.items, process.env.BOOK_SERVICE_URL)}
       ${orderTotalBlock(order)}
       <p style="margin-top:24px;">Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua email này hoặc hotline hỗ trợ.</p>
       <p style="color:#888;font-size:13px;">Đây là email tự động, vui lòng không trả lời email này.</p>
@@ -101,7 +100,7 @@ export function orderStatusUpdateEmail({ order, newStatus }) {
       <h2 style="color:#1976d2;">Cập nhật trạng thái đơn hàng</h2>
       <p>Đơn hàng <strong>${order.orderCode}</strong> của bạn vừa được cập nhật trạng thái: <span style="color:#d32f2f;font-weight:bold;">${getStatusVi(newStatus)}</span>.</p>
       ${orderInfoBlock(order)}
-      ${orderItemsTable(order.items)}
+      ${orderItemsTable(order.items, process.env.BOOK_SERVICE_URL)}
       ${orderTotalBlock(order)}
       <p style="margin-top:24px;">Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua email này hoặc hotline hỗ trợ.</p>
       <p style="color:#888;font-size:13px;">Đây là email tự động, vui lòng không trả lời email này.</p>

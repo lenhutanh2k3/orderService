@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { orderConfirmationEmail, orderStatusUpdateEmail } from './emailTemplates.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const USER_SERVICE = process.env.USER_SERVICE || 'http://localhost:5000';
-
+console.log("Main service url", process.env.MAIN_SERVICE_URL);
 // Gửi email thông báo đơn hàng tạo thành công (HTML)
 export async function sendOrderConfirmationEmail(userEmail, order) {
     try {
@@ -10,8 +11,9 @@ export async function sendOrderConfirmationEmail(userEmail, order) {
             console.error('Email không được cung cấp');
             return false;
         }
-        const html = orderConfirmationEmail({ order });
-        const response = await axios.post(`${USER_SERVICE}/api/email/order-confirmation`, {
+        const bookServiceBaseUrl = process.env.BOOK_SERVICE_URL || 'http://localhost:8000';
+        const html = orderConfirmationEmail({ order, bookServiceBaseUrl });
+        const response = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/email/order-confirmation`, {
             to: userEmail,
             subject: `Xác nhận đơn hàng #${order.orderCode}`,
             html
@@ -26,8 +28,9 @@ export async function sendOrderConfirmationEmail(userEmail, order) {
 // Gửi email thông báo cập nhật trạng thái đơn hàng (HTML)
 export async function sendOrderStatusEmail(userEmail, order, newStatus) {
     try {
-        const html = orderStatusUpdateEmail({ order, newStatus });
-        const response = await axios.post(`${USER_SERVICE}/api/email/order-status`, {
+        const bookServiceBaseUrl = process.env.BOOK_SERVICE_URL || 'http://localhost:8000';
+        const html = orderStatusUpdateEmail({ order, newStatus, bookServiceBaseUrl });
+        const response = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/email/order-status`, {
             to: userEmail,
             subject: `Đơn hàng #${order.orderCode} đã được cập nhật trạng thái: ${newStatus}`,
             html
@@ -39,19 +42,23 @@ export async function sendOrderStatusEmail(userEmail, order, newStatus) {
     }
 }
 
-// Gửi email thông báo thanh toán (có thể nâng cấp sau)
-export async function sendPaymentNotificationEmail(userEmail, orderCode, paymentStatus, amount, paymentMethod) {
+// Gửi email thông báo thanh toán online (thành công/thất bại)
+export async function sendPaymentNotificationEmail(to, orderCode, status, amount, method, orderId = '', reason = '') {
     try {
-        const response = await axios.post(`${USER_SERVICE}/api/email/payment-notification`, {
-            to: userEmail,
+        const orderLink = `${process.env.FRONTEND_URL}/orders/${orderId}`;
+        const response = await axios.post(`${process.env.MAIN_SERVICE_URL}/api/email/payment-notification`, {
+            to,
             orderCode,
-            paymentStatus,
+            paymentStatus: status,
             amount,
-            paymentMethod
+            paymentMethod: method,
+            orderId,
+            reason,
+            orderLink
         });
         return response.data.success;
     } catch (error) {
-        console.error('Lỗi gửi email thông báo thanh toán:', error.message);
+        console.error('Lỗi gửi email thông báo thanh toán:', error.response?.data || error.message);
         return false;
     }
-} 
+}
