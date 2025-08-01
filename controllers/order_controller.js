@@ -8,6 +8,7 @@ import response from '../utils/response.js';
 import { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_METHOD, TRANSACTION_STATUS } from '../utils/orderConstants.js';
 import crypto from 'crypto';
 import moment from 'moment';
+
 import querystring from 'qs';
 import axios from 'axios';
 import { sendOrderConfirmationEmail, sendOrderStatusEmail, sendPaymentNotificationEmail } from '../utils/emailService.js';
@@ -35,7 +36,6 @@ function verifyVnpaySignature(vnp_Params, hashSecret) {
     delete params['vnp_SecureHashType'];
     const sortedParams = sortObject(params);
     const signData = querystring.stringify(sortedParams, { encode: false });
-    console.log('[VNPay SIGNDATA][VERIFY]', signData);
     const hmac = crypto.createHmac('sha512', hashSecret);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
     return secureHash === signed;
@@ -191,7 +191,6 @@ const order_controller = {
             newOrder.orderStatus = ORDER_STATUS.PENDING;
             newOrder.paymentStatus = PAYMENT_STATUS.UNPAID;
             newOrder.notes = note;
-            newOrder.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
             newOrder.finalAmount = finalAmount;
             newOrder.markModified('shippingAddress');
 
@@ -343,9 +342,6 @@ const order_controller = {
                 throw new AppError('Cấu hình VNPay chưa đầy đủ trên server.', 500);
             }
 
-            // Thêm log để kiểm tra URL callback
-            console.log('[VNPay CONFIG] vnp_ReturnUrl:', vnp_ReturnUrl);
-
             const ipAddr = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '127.0.0.1';
             const date = new Date();
             const createDate = moment(date).format('YYYYMMDDHHmmss');
@@ -373,7 +369,6 @@ const order_controller = {
 
             vnp_Params = sortObject(vnp_Params);
             const signData = querystring.stringify(vnp_Params, { encode: false });
-            console.log('[VNPay SIGNDATA][CREATE]', signData);
             const hmac = crypto.createHmac('sha512', vnp_HashSecret);
             const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
             vnp_Params.vnp_SecureHash = signed;
@@ -398,7 +393,6 @@ const order_controller = {
                 }
             }
 
-            console.log('[VNPay] Tạo URL thanh toán cho order', order._id, 'vnp_Amount:', vnp_Params.vnp_Amount);
             return response(res, 200, 'Tạo URL thanh toán VNPay thành công', { vnpUrl });
         } catch (error) {
             await session.abortTransaction();
@@ -421,8 +415,6 @@ const order_controller = {
             throw new AppError('Thiếu mã giao dịch (vnp_TxnRef).', 400);
         }
 
-        console.log(`[VNPay Callback] Bắt đầu xử lý cho paymentId: ${paymentId}`);
-
         const payment = await Payment.findById(paymentId).session(session);
         if (!payment) {
             return { RspCode: '01', Message: 'Order not found' };
@@ -433,11 +425,8 @@ const order_controller = {
             return { RspCode: '01', Message: 'Order not found' };
         }
 
-        console.log(`[VNPay Callback] Found Order: ${order.orderCode}, Payment: ${payment._id}`);
-
         // 2. Check if already processed
         if (payment.transactionStatus === TRANSACTION_STATUS.SUCCESS) {
-            console.log('[VNPay Callback] Giao dịch đã được xử lý thành công trước đó.');
             return {
                 RspCode: '02',
                 Message: 'Order already confirmed',
@@ -459,8 +448,6 @@ const order_controller = {
                 redirect: `${process.env.FRONTEND_URL}/payment/error?orderId=${order._id}&code=${encodeURIComponent('Chữ ký giao dịch không hợp lệ.')}`
             };
         }
-
-        console.log('[VNPay Callback] Chữ ký hợp lệ.');
 
         // 4. Log the callback
         await PaymentLog.create([{
@@ -583,11 +570,9 @@ const order_controller = {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
-            console.log('[VNPay RETURN] Received callback:', req.query);
             const result = await order_controller._processVnpayCallback(req.query, req, session);
             await session.commitTransaction();
 
-            console.log(`[VNPay RETURN] Redirecting to: ${result.redirect}`);
             return res.redirect(result.redirect);
 
         } catch (error) {
@@ -604,11 +589,9 @@ const order_controller = {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
-            console.log('[VNPay IPN] Received callback:', req.query);
             const result = await order_controller._processVnpayCallback(req.query, req, session);
             await session.commitTransaction();
 
-            console.log(`[VNPay IPN] Responding with: RspCode=${result.RspCode}, Message=${result.Message}`);
             return res.status(200).json({ RspCode: result.RspCode, Message: result.Message });
 
         } catch (error) {
@@ -628,6 +611,7 @@ const order_controller = {
             const { id: orderId } = req.params;
             const userId = req.user.id;
             const userEmail = req.user.email;
+            const { confirmCancel } = req.body || {};
 
             // 1. Find and validate the order
             const order = await Order.findById(orderId).session(session);
@@ -652,13 +636,26 @@ const order_controller = {
                 await order.save({ session });
                 return response(res, 400, 'Đơn hàng đã hết hạn và đã bị hủy. Vui lòng tạo đơn hàng mới.');
             }
-            if (order.retryCount >= 2) { // Đã retry 2 lần, lần này là lần thứ 3
+
+            // Nếu retryCount = 2 (lần thứ 3):
+            if (order.retryCount >= 2) {
                 await session.abortTransaction();
-                return res.status(409).json({
-                    message: 'Bạn đã thử lại thanh toán 3 lần không thành công. Bạn có muốn hủy đơn hàng này không?',
-                    shouldConfirmCancel: true
-                });
+                if (confirmCancel === true) {
+                    // Gọi hàm hủy đơn hàng (trả lại tồn kho, gửi email...)
+                    req.params.id = orderId;
+                    req.user = { id: userId, email: userEmail, role: req.user.role };
+                    return order_controller.cancelOrder(req, res, next);
+                } else {
+                    // Trả về cảnh báo xác nhận hủy
+                    return res.status(409).json({
+                        message: 'Bạn đã thanh toán thất bại 3 lần. Bạn có muốn hủy đơn hàng không?',
+                        shouldConfirmCancel: true
+                    });
+                }
             }
+
+            // Nếu retryCount < 2: cảnh báo số lần còn lại
+            const remainRetry = 2 - order.retryCount;
             // Tăng retryCount
             order.retryCount += 1;
 
@@ -726,11 +723,10 @@ const order_controller = {
 
             const vnpUrl = `${vnp_Url}?${querystring.stringify(vnp_Params, { encode: false })}`;
 
-            // Commit transaction and return URL
+            // Commit transaction and return URL + cảnh báo số lần còn lại
             await session.commitTransaction();
 
-            return response(res, 200, 'Tạo URL thanh toán lại thành công.', { vnpUrl });
-
+            return response(res, 200, `Tạo URL thanh toán lại thành công. Bạn còn ${remainRetry} lần thanh toán lại trước khi đơn bị hủy.`, { vnpUrl, remainRetry });
         } catch (error) {
             await session.abortTransaction();
             console.error('Lỗi khi thử lại thanh toán:', error);
@@ -993,7 +989,6 @@ const order_controller = {
             const userRole = req.user.role;
             const userEmail = req.user.email;
             const userToken = req.headers.authorization;
-
             const order = await Order.findById(id).session(session);
             if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
             if (order.userId.toString() !== userId && userRole !== 'admin') {
@@ -1154,7 +1149,6 @@ const order_controller = {
             if (!mongoose.Types.ObjectId.isValid(bookId)) {
                 return response(res, 400, 'ID sách không hợp lệ.', { hasOrder: false });
             }
-            console.log(bookId);
             const order = await Order.findOne({ 'items.bookId': bookId });
             return response(res, 200, 'Kiểm tra đơn hàng chứa sách thành công.', { hasOrder: !!order });
         } catch (error) {

@@ -1,5 +1,4 @@
 
-
 // Thêm hàm chuyển trạng thái và phương thức sang tiếng Việt
 const STATUS_VI = {
   PENDING: 'Chờ xử lý',
@@ -32,7 +31,6 @@ export function orderItemsTable(items, bookServiceBaseUrl) {
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
       <thead>
         <tr style="background:#f5f5f5;">
-          <th style="padding:8px;border:1px solid #eee;">Ảnh</th>
           <th style="padding:8px;border:1px solid #eee;">Tên sách</th>
           <th style="padding:8px;border:1px solid #eee;">Số lượng</th>
           <th style="padding:8px;border:1px solid #eee;">Giá</th>
@@ -40,14 +38,8 @@ export function orderItemsTable(items, bookServiceBaseUrl) {
       </thead>
       <tbody>
         ${items.map(item => {
-    const imagePath = (item.primaryImage || '').replace(/\\/g, '/');
-    const imageUrl = `${bookServiceBaseUrl}/${imagePath}`;
-
     return `
             <tr>
-              <td style="padding:8px;border:1px solid #eee;text-align:center;">
-                <img src="${imageUrl}" alt="${item.title}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;"/>
-              </td>
               <td style="padding:8px;border:1px solid #eee;">${item.title}</td>
               <td style="padding:8px;border:1px solid #eee;text-align:center;">${item.quantity}</td>
               <td style="padding:8px;border:1px solid #eee;text-align:right;">${item.price.toLocaleString('vi-VN')}₫</td>
@@ -80,7 +72,7 @@ export function orderTotalBlock(order) {
     `;
 }
 export function orderConfirmationEmail({ order }) {
-  console.log('[EMAIL TEMPLATE] orderConfirmationEmail input:', JSON.stringify(order, null, 2));
+
   return `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;">
       <h2 style="color:#1976d2;">Xác nhận đặt hàng thành công!</h2>
@@ -94,7 +86,6 @@ export function orderConfirmationEmail({ order }) {
     `;
 }
 export function orderStatusUpdateEmail({ order, newStatus }) {
-  console.log('[EMAIL TEMPLATE] orderStatusUpdateEmail input:', JSON.stringify({ order, newStatus }, null, 2));
   return `
     <div style="font-family:sans-serif;max-width:600px;margin:auto;">
       <h2 style="color:#1976d2;">Cập nhật trạng thái đơn hàng</h2>

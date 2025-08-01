@@ -35,9 +35,9 @@ const OrderSchema = new mongoose.Schema({
     notes: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    expiresAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) }, // 24h 
     finalAmount: { type: Number, default: 0 },
-    retryCount: { type: Number, default: 0 }, // Số lần retry thanh toán
+    retryCount: { type: Number, default: 0 },
 });
 
 OrderSchema.index({ userId: 1, orderStatus: 1, createdAt: -1 });
