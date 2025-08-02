@@ -1007,6 +1007,7 @@ const order_controller = {
 
             for (const item of order.items) {
                 try {
+                    // Cập nhật stock (trả lại tồn kho)
                     await axios.put(
                         `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock`,
                         {
@@ -1016,8 +1017,19 @@ const order_controller = {
                             headers: { Authorization: userToken },
                         }
                     );
-                } catch (stockError) {
-                    console.error('Lỗi cập nhật stock:', stockError);
+
+                    // Giảm salesCount (trừ số lượng đã bán)
+                    await axios.put(
+                        `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/sales`,
+                        {
+                            quantity: -item.quantity, // Số âm để giảm
+                        },
+                        {
+                            headers: { Authorization: userToken },
+                        }
+                    );
+                } catch (error) {
+                    console.error('Lỗi cập nhật stock/sales:', error);
                 }
             }
             order.orderStatus = ORDER_STATUS.CANCELED;

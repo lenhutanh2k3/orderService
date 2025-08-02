@@ -58,9 +58,10 @@ cron.schedule('*/10 * * * *', async () => {
             let transactionCommitted = false;
 
             try {
-                // Trả lại tồn kho
+                // Trả lại tồn kho và giảm salesCount
                 for (const item of order.items) {
                     try {
+                        // Trả lại tồn kho
                         await axios.put(
                             `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/stock/cron`,
                             { quantity: item.quantity },
@@ -70,8 +71,21 @@ cron.schedule('*/10 * * * *', async () => {
                                 }
                             }
                         );
+
+                        // Giảm salesCount
+                        await axios.put(
+                            `${process.env.BOOK_SERVICE_URL}/api/books/${item.bookId}/sales`,
+                            { quantity: -item.quantity }, // Số âm để giảm
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            }
+                        );
+
+                        console.log(`[CRON] Đã cập nhật stock và sales cho book ${item.bookId}: +${item.quantity} stock, -${item.quantity} sales`);
                     } catch (err) {
-                        console.error('Lỗi cập nhật tồn kho khi tự động hủy:', err);
+                        console.error('Lỗi cập nhật stock/sales khi tự động hủy:', err);
                         console.error('Chi tiết lỗi:', err.response?.data || err.message);
                     }
                 }
