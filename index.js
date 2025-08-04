@@ -34,7 +34,7 @@ app.listen(port, () => {
 });
 dbconnect();
 
-// Cronjob tự động hủy đơn hàng PENDING chưa thanh toán sau 24h - chạy mỗi 1 phút (cho test)
+// Cronjob tự động hủy đơn hàng PENDING chưa thanh toán sau 24h - chạy mỗi 10 phút
 cron.schedule('*/10 * * * *', async () => {
     try {
         const now = new Date();
@@ -44,7 +44,6 @@ cron.schedule('*/10 * * * *', async () => {
             paymentStatus: PAYMENT_STATUS.UNPAID,
             expiresAt: { $lt: now }
         });
-
         if (expiredOrders.length > 0) {
             console.log(`[CRON] Tìm thấy ${expiredOrders.length} đơn hàng quá hạn chưa thanh toán`);
             for (const order of expiredOrders) {
@@ -95,7 +94,6 @@ cron.schedule('*/10 * * * *', async () => {
                 order.paymentStatus = PAYMENT_STATUS.UNPAID;
                 await order.save({ session });
                 console.log(`[CRON] Đã cập nhật trạng thái đơn hàng: ${order.orderCode} -> ${order.orderStatus}`);
-
                 // Hủy payment nếu có
                 if (order.activePaymentId) {
                     const payment = await Payment.findById(order.activePaymentId).session(session);
