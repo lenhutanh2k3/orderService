@@ -20,7 +20,8 @@ const verifyToken = (req, res, next) => {
         console.error('Verify token error:', error);
 
         if (error.name === 'TokenExpiredError') {
-            return response(res, 401, 'Token đã hết hạn. Vui lòng đăng nhập lại.');
+            console.error('Token expired at:', error.expiredAt);
+            return response(res, 401, 'Token đã hết hạn. Vui lòng đăng nhập lại hoặc refresh token.');
         } else if (error.name === 'JsonWebTokenError') {
             return response(res, 401, 'Token không hợp lệ.');
         } else {

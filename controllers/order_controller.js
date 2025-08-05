@@ -1167,8 +1167,37 @@ const order_controller = {
             next(error);
         }
     },
+
+    // Lấy tổng doanh thu
+    getTotalRevenue: async (req, res, next) => {
+        try {
+            // Tính tổng doanh thu từ các đơn hàng đã giao và đã thanh toán
+            const totalRevenue = await Order.aggregate([
+                {
+                    $match: {
+                        orderStatus: { $in: [ORDER_STATUS.DELIVERED] },
+                        paymentStatus: PAYMENT_STATUS.PAID
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: '$finalAmount' }
+                    }
+                }
+            ]);
+
+            const revenue = totalRevenue.length > 0 ? totalRevenue[0].totalRevenue : 0;
+
+            return response(res, 200, 'Lấy tổng doanh thu thành công', {
+                totalRevenue: revenue
+            });
+        } catch (error) {
+            console.error('Get total revenue error:', error);
+            next(error);
+        }
+    }
+
 };
-
-
 
 export default order_controller;
